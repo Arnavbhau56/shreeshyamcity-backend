@@ -69,59 +69,90 @@ class AgentViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         data = request.data.copy()
         
-        # Create User account for agent if email provided
-        if 'email' in data and 'password' in data:
+        # Validate required fields
+        if not data.get('name') or not data.get('role'):
+            return Response({'error': 'Name and role are required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Create User account for agent if email and password provided
+        if data.get('email') and data.get('password'):
             # Use first name as username
             username = data.get('name', '').split()[0].lower()
             
             # Make username unique if already exists
-            if User.objects.filter(username=username).exists():
-                username = f"{username}{User.objects.filter(username__startswith=username).count() + 1}"
+            base_username = username
+            counter = 1
+            while User.objects.filter(username=username).exists():
+                username = f"{base_username}{counter}"
+                counter += 1
             
             # Check if email already exists
             if User.objects.filter(email=data['email']).exists():
                 return Response({'error': 'Email already exists'}, status=status.HTTP_400_BAD_REQUEST)
             
-            user = User.objects.create_user(
-                username=username,
-                email=data['email'],
-                password=data['password'],
-                role='agent'
-            )
-            agent_data = {
-                'user': user.id,
-                'name': data.get('name'),
-                'role': data.get('role'),
-                'phone': data.get('phone', ''),
-                'photo': data.get('photo', ''),
-                'deals': data.get('deals', 0)
-            }
+            try:
+                user = User.objects.create_user(
+                    username=username,
+                    email=data['email'],
+                    password=data['password'],
+                    role='agent'
+                )
+                
+                # Create agent with user reference
+                agent = Agent.objects.create(
+                    user=user,
+                    name=data.get('name'),
+                    role=data.get('role'),
+                    phone=data.get('phone', ''),
+                    photo=data.get('photo', ''),
+                    deals=int(data.get('deals', 0))
+                )
+                
+                serializer = self.get_serializer(agent)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            except Exception as e:
+                return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         else:
             # Create agent without user account
-            agent_data = {
-                'name': data.get('name'),
-                'role': data.get('role'),
-                'phone': data.get('phone', ''),
-                'photo': data.get('photo', ''),
-                'deals': data.get('deals', 0)
-            }
-        
-        serializer = self.get_serializer(data=agent_data)
-        serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
-        headers = self.get_success_headers(serializer.data)
-        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
-    
-    @action(detail=False, methods=['post'])
-    def login(self, request):
-        email = request.data.get('email')
-        password = request.data.get('password')
-        
-        try:
-            agent = Agent.objects.get(email=email)
-            if check_password(password, agent.password):
+            try:
+                agent = Agent.objects.create(
+                    name=data.get('name'),
+                    role=data.get('role'),
+                    phone=data.get('phone', ''),
+                    photo=data.get('photo', ''),
+                    deals=int(data.get('deals', 0))
+                )
                 serializer = self.get_serializer(agent)
-                return Response(serializer.data)
-            return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
-        except Agent.DoesNotExist:
-            return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            except Exception as e:
+                return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        
+        # Add email from user if available
+        data = serializer.data
+        for item in data:
+            agent = Agent.objects.get(id=item['id'])
+            if agent.user:
+                item['email'] = agent.user.email
+            else:
+                item['email'] = ''
+        
+        return Response({'results': data})
+    
+    @action(detail=False, methods=['get'])
+    def export_csv(self, request):
+        import csv
+        from django.http import HttpResponse
+        
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="agents.csv"'
+        writer = csv.writer(response)
+        writer.writerow(['Name', 'Role', 'Email', 'Phone', 'Deals'])
+        
+        for agent in self.get_queryset():
+            email = agent.user.email if agent.user else ''
+            writer.writerow([agent.name, agent.role, email, agent.phone, agent.deals])
+        
+        return response
