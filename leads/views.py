@@ -24,13 +24,17 @@ class LeadViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
         
+        # Send email asynchronously (don't block response)
         lead_data = serializer.data
-        send_lead_notification(
-            lead_data.get('name'),
-            lead_data.get('email'),
-            lead_data.get('phone'),
-            lead_data.get('message', '')
-        )
+        try:
+            send_lead_notification(
+                lead_data.get('name'),
+                lead_data.get('email'),
+                lead_data.get('phone'),
+                lead_data.get('message', '')
+            )
+        except Exception as e:
+            print(f"Email failed but lead saved: {e}")
         
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
@@ -44,12 +48,16 @@ class EnquiryViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
         
+        # Send email asynchronously (don't block response)
         enquiry_data = serializer.data
-        send_enquiry_confirmation(
-            enquiry_data.get('name'),
-            request.data.get('email', ''),
-            enquiry_data.get('property')
-        )
+        try:
+            send_enquiry_confirmation(
+                enquiry_data.get('name'),
+                request.data.get('email', ''),
+                enquiry_data.get('property')
+            )
+        except Exception as e:
+            print(f"Email failed but enquiry saved: {e}")
         
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)

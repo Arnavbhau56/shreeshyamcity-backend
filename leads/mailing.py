@@ -1,5 +1,9 @@
 from django.core.mail import send_mail
 from django.conf import settings
+import socket
+
+# Set socket timeout for email
+socket.setdefaulttimeout(10)
 
 def send_enquiry_confirmation(name, email, property_name):
     """Send confirmation email to customer who made an enquiry"""
