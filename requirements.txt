@@ -102,7 +102,7 @@ google-generativeai==0.3.2
 google-resumable-media==2.7.0
 googleapis-common-protos==1.62.0
 gprof2dot==2024.6.6
-grpcio==1.60.0
+grpcio>=1.62.0
 grpcio-status==1.60.0
 gunicorn==21.2.0
 h11==0.14.0
