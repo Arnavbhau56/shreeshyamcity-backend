@@ -32,9 +32,12 @@ For queries, contact: hello@shreeshyamcity.com
             [email],
             fail_silently=False,
         )
+        print(f"✓ Email sent to {email}")
         return True
     except Exception as e:
-        print(f"Error sending email: {e}")
+        import traceback
+        print(f"✗ Error sending email to {email}: {e}")
+        print(traceback.format_exc())
         return False
 
 def send_lead_notification(name, email, phone, message=''):
@@ -59,7 +62,10 @@ Please follow up with this lead as soon as possible.
             [settings.ADMIN_EMAIL],
             fail_silently=False,
         )
+        print(f"✓ Notification sent to admin")
         return True
     except Exception as e:
-        print(f"Error sending notification: {e}")
+        import traceback
+        print(f"✗ Error sending notification: {e}")
+        print(traceback.format_exc())
         return False
